@@ -1,0 +1,111 @@
+# version: '3.8'
+services:
+  postgres:
+    image: postgres:14
+    container_name: de-postgres
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_INITDB_ARGS: "-E UTF8"
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init/de-postgres:/docker-entrypoint-initdb.d/
+      - postgres_data:/var/lib/postgresql/data
+      - ./data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airflow -d airflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+     
+  # Инициализация БД Airflow — выполняется один раз
+  airflow-init:
+    image: apache/airflow:2.9.3
+    container_name: de-airflow-init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW_CONN_TEAM3_STORE: postgresql://airflow:airflow@postgres:5432/team_3_store
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./data:/opt/airflow/data
+    command:
+      bash -c "
+      airflow db init &&
+      airflow users create -r Admin -u admin -f Admin -l User -p admin --email admin@example.com || echo 'Admin user already exists'
+      "
+    restart: "no"  # Запускается один раз
+ 
+  # Веб-сервер Airflow
+  airflow-webserver:
+    build: .
+    # image: apache/airflow:2.9.3
+    container_name: de-airflow-web
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully  # Ждёт успешного завершения инициализации
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__WEBSERVER__EXPOSE_CONFIG: 'true'
+      AIRFLOW_CONN_TEAM3_STORE: postgresql://airflow:airflow@postgres:5432/team_3_store
+      AIRFLOW_CONN_POSTGRES_DEFAULT: postgresql://airflow:airflow@postgres:5432/team_3_store
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./data:/opt/airflow/data
+    ports:
+      - "8080:8080"
+    command: webserver
+    healthcheck:
+      test: ["CMD", "airflow", "db", "check"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+    restart: unless-stopped
+ 
+  # Планировщик Airflow
+  airflow-scheduler:
+    build: .
+    # image: apache/airflow:2.9.3
+    container_name: de-airflow-scheduler
+    depends_on:
+      airflow-webserver:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
+      AIRFLOW_CONN_TEAM3_STORE: postgresql://airflow:airflow@postgres:5432/team_3_store
+      AIRFLOW_CONN_POSTGRES_DEFAULT: postgresql://airflow:airflow@postgres:5432/team_3_store
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - ./data:/opt/airflow/data
+    command: scheduler
+    restart: unless-stopped
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: de-pgadmin
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@example.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json
+    restart: unless-stopped
+
+ 
+volumes:
+  postgres_data:
+  pgadmin_data:

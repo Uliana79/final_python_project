@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Team3 Store",
+      "Group": "Delivery Project",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "team_3_store",
+      "Username": "airflow",
+      "Password": "airflow",
+      "SSLMode": "prefer"
+    }
+  }
+}
