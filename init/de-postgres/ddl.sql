@@ -1,3 +1,5 @@
+CREATE DATABASE team_3_store;
+\c team_3_store;
 
 CREATE TABLE IF NOT EXISTS "users" (
                                        "user_id" int,
@@ -50,7 +52,7 @@ CREATE TABLE IF NOT EXISTS "orders" (
 
 
 CREATE TABLE IF NOT EXISTS "order_items" (
-                                             "id" serial,
+                                             "id" text,
                                              "order_id" int,
                                              "item_id" int,
                                              "item_quantity" smallint DEFAULT 0,
@@ -63,7 +65,7 @@ CREATE TABLE IF NOT EXISTS "order_items" (
 
 
 CREATE TABLE IF NOT EXISTS "order_drivers" (
-                                               "id" serial,
+                                               "id" text,
                                                "order_id" int,
                                                "driver_id" int,
                                                "is_final" boolean DEFAULT true,
@@ -95,41 +97,44 @@ ALTER TABLE "order_drivers"
 
 CREATE TABLE IF NOT EXISTS mart_orders (
     id                      SERIAL PRIMARY KEY,
-    year                    INT NOT NULL,
-    month                   INT NOT NULL,
-    day                     INT NOT NULL,
+    year_num                INT NOT NULL,
+    month_num               INT NOT NULL,
+    day_num                 INT NOT NULL,
     city                    VARCHAR(100) NOT NULL,
     store_id                INT NOT NULL,
+    store_name              TEXT,
     -- Метрики
     turnover                NUMERIC(15,2),
     revenue                 NUMERIC(15,2),
     profit                  NUMERIC(15,2),
-    orders_created          INT,
-    orders_delivered        INT,
-    orders_canceled         INT,
-    orders_canceled_after_delivery INT,
-    orders_canceled_service_error INT,
-    customers_count         INT,
+    created_orders_cnt      INT,
+    delivered_orders_cnt    INT,
+    canceled_orders_cnt     INT,
+    cancel_after_delivery_cnt INT,
+    service_error_cancel_cnt INT,
+    buyers_cnt              INT,
     avg_check               NUMERIC(15,2),
-    orders_per_customer     NUMERIC(10,2),
-    revenue_per_customer    NUMERIC(15,2),
-    driver_changes_count    INT,
-    active_drivers_count    INT
+    orders_per_buyer        NUMERIC(10,2),
+    revenue_per_buyer       NUMERIC(15,2),
+    driver_changes_cnt      INT,
+    active_drivers_cnt      INT
 );
 
 CREATE TABLE IF NOT EXISTS mart_items (
     id                      SERIAL PRIMARY KEY,
-    year                    INT NOT NULL,
-    month                   INT NOT NULL,
-    day                     INT NOT NULL,
+    year_num                INT NOT NULL,
+    month_num               INT NOT NULL,
+    day_num                 INT NOT NULL,
     city                    VARCHAR(100) NOT NULL,
     store_id                INT NOT NULL,
-    category                VARCHAR(100) NOT NULL,
+    store_name              TEXT,
+    item_category           VARCHAR(100) NOT NULL,
     item_id                 INT NOT NULL,
+    item_title              TEXT,
     -- Метрики
     item_turnover           NUMERIC(15,2),
-    items_ordered           INT,
-    items_canceled          INT,
-    orders_with_item        INT,
-    orders_with_item_cancel INT
+    ordered_qty             INT,
+    canceled_qty            INT,
+    orders_with_item_cnt    INT,
+    orders_with_item_cancel_cnt  INT
 );

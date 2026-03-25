@@ -11,6 +11,9 @@ RUN apt-get update && \
         curl \
         && rm -rf /var/lib/apt/lists/*
 
+RUN mkdir -p /opt/airflow/jars
+RUN curl -o /opt/airflow/jars/postgresql-42.7.3.jar \
+    https://jdbc.postgresql.org/download/postgresql-42.7.3.jar
+
 USER airflow
 RUN pip install --no-cache-dir -r /opt/airflow/requirements.txt
-

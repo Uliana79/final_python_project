@@ -5,6 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
+import re
 from sqlalchemy import create_engine, text
 
 from airflow import DAG
@@ -16,6 +17,7 @@ POSTGRES_CONN_ID = "postgres_default"
 
 # Для локального теста  заменить на абсолютный путь:
 # DATA_DIR = Path("/Users/kataacmeneva/final_python_project/data")
+DATA_DIR = Path("/opt/airflow/data")
 
 def get_parquet_files():
     return sorted(DATA_DIR.glob("chunk_*.parquet"))
@@ -57,6 +59,18 @@ def truncate_core_tables():
     with engine.begin() as connection:
         connection.execute(text(sql))
 
+def normalize_phone(phone):
+    if pd.isna(phone):
+        return None
+    
+    digits = re.sub(r'\D', '', str(phone))
+    
+    if not digits:
+        return None
+    
+    if digits[0] == '8':
+        digits = '7' + digits[1:]
+    return f"+{digits}"
 
 def load_users():
     all_parts = []
@@ -68,6 +82,8 @@ def load_users():
         users_df = users_df.dropna(subset=["user_id"])
         users_df = users_df.drop_duplicates()
 
+        users_df["user_phone"] = users_df["user_phone"].apply(normalize_phone)
+        
         all_parts.append(users_df)
 
     result = pd.concat(all_parts, ignore_index=True)
@@ -87,6 +103,8 @@ def load_drivers():
         drivers_df = drivers_df.dropna(subset=["driver_id"])
         drivers_df = drivers_df.drop_duplicates()
 
+        drivers_df["driver_phone"] = drivers_df["driver_phone"].apply(normalize_phone)
+        
         all_parts.append(drivers_df)
 
     result = pd.concat(all_parts, ignore_index=True)
@@ -105,14 +123,21 @@ def load_stores():
         stores_df = df[["store_id", "store_address"]].copy()
         stores_df = stores_df.dropna(subset=["store_id"])
         stores_df = stores_df.drop_duplicates()
-
+        
         all_parts.append(stores_df)
 
     result = pd.concat(all_parts, ignore_index=True)
     result = result.drop_duplicates(subset=["store_id"])
 
-    result["store_name"] = None
-    result["store_city"] = None
+    result["store_name"] = result["store_address"].apply(
+        lambda x: x.split(',')[0].strip() if pd.notna(x) and ',' in str(x) else None
+    )
+    
+    result["store_city"] = result["store_address"].apply(
+        lambda x: x.split(',')[1].strip() if pd.notna(x) and ',' in str(x) and len(x.split(',')) >= 2 else None
+    )
+    # result["store_name"] = None
+    # result["store_city"] = None
 
     # todo: check DDL
     result = result[["store_id", "store_name", "store_city", "store_address"]]
@@ -166,12 +191,16 @@ def load_orders():
 
         orders_df = orders_df.dropna(subset=["order_id"])
         orders_df = orders_df.drop_duplicates(subset=["order_id"])
-
+        
+        orders_df["delivery_city"] = orders_df["address_text"].apply(
+            lambda x: x.split(',')[0].strip() if pd.notna(x) and ',' in str(x) else None
+        )
+        
         all_parts.append(orders_df)
 
     result = pd.concat(all_parts, ignore_index=True)
     result = result.drop_duplicates(subset=["order_id"])
-    result["delivery_city"] = None
+    # result["delivery_city"] = None
 
     # TODO порядок колонок как в DDL
     result = result[
