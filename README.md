@@ -1,96 +1,138 @@
 # final_python_project
 
-База данных: team_3_store
+##  Описание
 
-Подключение: postgres_conn_id='team3_store'
+Проект реализует ETL-пайплайн обработки данных по доставкам.
 
-Путь к папке с данными: '/opt/airflow/data'
+Функциональность:
 
-DAG load_core_entities
+* загрузка денормализованных parquet-файлов
+* нормализация данных (core слой)
+* загрузка в PostgreSQL
+* построение аналитических витрин
 
-load_core_entities — это DAG первого этапа ETL-пайплайна, который загружает данные из исходных parquet-файлов в нормализованные таблицы PostgreSQL.
+---
 
-Назначение
+##  Архитектура
 
-Исходные данные представлены в виде набора denormalized parquet-файлов chunk_*.parquet, где в одной записи одновременно содержатся данные о заказе, пользователе, магазине, товаре и курьере.
-Задача DAG — преобразовать эти данные в набор сущностей реляционной модели и загрузить их в core-слой БД.
+```text
+Parquet (data/)
+        ↓
+load_core_entities (Airflow DAG)
+        ↓
+Core tables (users, orders, items, ...)
+        ↓
+build_datamarts (Airflow DAG)
+        ↓
+mart_orders / mart_items
+```
 
-Что делает DAG
+---
 
-DAG выполняет следующие шаги:
+##  Структура проекта
 
-Очищает core-таблицы перед загрузкой:
-order_drivers
-order_items
-orders
-users
-drivers
-stores
-items
-Считывает все parquet-файлы формата chunk_*.parquet из директории с исходными данными.
-Разделяет denormalized данные на нормализованные сущности:
-users
-drivers
-stores
-items
-orders
-order_items
-order_drivers
-Для каждой сущности:
-выбирает нужные поля
-удаляет дубликаты
-приводит значения к нужному формату
-загружает результат в PostgreSQL
-Логика загрузки
+```text
+final_python_project/
+│
+├── airflow/
+│   ├── dags/
+│   │   ├── load_core_entities.py
+│   │   ├── build_datamarts.py
+│   │   └── build_datamarts_spark.py
+│   │
+│   └── logs/
+│
+├── data/                      # parquet файлы (chunk_*.parquet)
+│
+├── init/
+│   └── de-postgres/
+│       └── ddl.sql            # создание таблиц
+│
+├── pgadmin/
+│   └── servers.json
+│
+├── docker-compose.yml
+├── Dockerfile
+├── requirements.txt
+└── README.md
+```
 
-DAG учитывает зависимости между таблицами и загружает данные в правильном порядке:
+---
 
-сначала загружаются справочные сущности:
-users
-drivers
-stores
-items
-затем загружается таблица:
-orders
-после этого загружаются таблицы связей и детализации:
-order_items
-order_drivers
+## Локальный запуск
 
-Такой порядок нужен для корректной работы внешних ключей.
+### 1. Клонирование
 
-Идемпотентность
+```bash
+git clone <repo_url>
+cd final_python_project
+```
 
-DAG сделан идемпотентным: перед каждой загрузкой выполняется TRUNCATE ... CASCADE core-таблиц.
-Это позволяет безопасно перезапускать пайплайн без накопления дублей.
+---
 
-DAG build_datamarts
+### 2. Запуск
 
-build_datamarts — это второй этап ETL-пайплайна, который строит аналитические витрины на основе нормализованных core-таблиц PostgreSQL.
+```bash
+docker-compose up --build
+```
 
-Назначение
+##  Доступы
 
-После загрузки исходных parquet-файлов в core-слой данные становятся пригодными для аналитической обработки.
-Задача DAG build_datamarts — агрегировать данные из сущностей и сформировать две витрины:
+### Airflow
 
-mart_orders — витрина заказов
-mart_items — витрина товаров
+```text
+http://localhost:8080
+```
 
-Эти витрины используются для расчёта бизнес-метрик и выполнения аналитических запросов.
+```text
+login: admin
+password: admin
+```
 
-Что делает DAG
+---
 
-DAG выполняет следующие шаги:
+### pgAdmin
 
-Создаёт таблицы витрин при отсутствии:
-mart_orders
-mart_items
-Очищает витрины перед пересчётом:
-TRUNCATE mart_orders
-TRUNCATE mart_items
-Пересчитывает агрегаты на основе core-таблиц:
-orders
-order_items
-order_drivers
-stores
-items
-Загружает агрегированные данные в витрины.
+```text
+http://localhost:5050
+```
+
+* master password: 123
+* пароль пользователя airflow: `airflow`
+
+---
+
+##  База данных
+
+Рабочая база:
+
+```text
+team_3_store
+```
+
+---
+
+## Просмотр данных
+
+### Через pgAdmin:
+
+```text
+team_3_store → Schemas → public → Tables
+```
+
+##  Порядок запуска
+
+```text
+1. load_core_entities
+2. проверка данных
+3. build_datamarts
+```
+
+---
+
+## Перезапуск DAG
+
+1. Обновить страницу Airflow
+2. Нажать **Clear task**
+3. Нажать **Trigger DAG**
+
