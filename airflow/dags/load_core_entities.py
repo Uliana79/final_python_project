@@ -224,7 +224,7 @@ def load_orders():
 
 
 def load_order_items():
-    all_parts = []
+    engine = get_engine()
 
     for file in get_parquet_files():
         df = pd.read_parquet(file)
@@ -272,13 +272,16 @@ def load_order_items():
             ]
         ]
 
-        all_parts.append(oi_df)
+        oi_df = oi_df.drop_duplicates(subset=["id"])
 
-    result = pd.concat(all_parts, ignore_index=True)
-    result = result.drop_duplicates(subset=["id"])
-
-    engine = get_engine()
-    result.to_sql("order_items", engine, if_exists="append", index=False)
+        oi_df.to_sql(
+            "order_items",
+            engine,
+            if_exists="append",
+            index=False,
+            method="multi",
+            chunksize=5000,
+        )
 
 
 def load_order_drivers():
