@@ -125,7 +125,7 @@ team_3_store → Schemas → public → Tables
 ```text
 1. load_core_entities
 2. проверка данных
-3. build_datamarts
+3. build_datamarts_spark
 ```
 
 ---
