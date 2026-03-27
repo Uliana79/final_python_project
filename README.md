@@ -71,7 +71,7 @@ cd final_python_project
 ---
 
 ### 2. Запуск
-
+работает с VPN
 ```bash
 docker-compose up --build
 ```
